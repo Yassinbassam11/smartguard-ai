@@ -1,0 +1,86 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>SmartGuard AI</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="course-label">AID 325 Blockchain Technology</p>
+        <h1>SmartGuard AI</h1>
+      </div>
+      <div class="wallet-panel">
+        <button id="connectWalletBtn" class="primary-button">Connect MetaMask</button>
+        <div class="wallet-meta">
+          <span id="walletAddress">Not connected</span>
+          <span id="networkName">Unknown network</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="app-shell">
+      <section class="workspace">
+        <div id="networkWarning" class="warning hidden">
+          Please switch MetaMask to Sepolia before running an audit.
+        </div>
+
+        <div class="editor-toolbar">
+          <div>
+            <h2>Contract Audit</h2>
+            <p>Submit Solidity code to create an on-chain audit record, scan with Slither, and store the report on IPFS.</p>
+          </div>
+          <button id="loadSampleBtn" class="secondary-button">Load Sample</button>
+        </div>
+
+        <textarea id="contractCode" spellcheck="false" placeholder="pragma solidity ^0.8.20;&#10;&#10;contract Example {&#10;    // Paste your Solidity contract here&#10;}"></textarea>
+        <div class="editor-footer">
+          <span id="charCount">0 characters</span>
+          <button id="analyzeBtn" class="primary-button" disabled>Analyze Contract</button>
+        </div>
+      </section>
+
+      <aside class="status-panel">
+        <h2>Audit Lifecycle</h2>
+        <ol id="progressList" class="progress-list">
+          <li>Running Slither analysis...</li>
+          <li>Getting AI explanations...</li>
+          <li>Uploading to IPFS...</li>
+          <li>Logging on blockchain...</li>
+        </ol>
+      </aside>
+
+      <section id="resultsDashboard" class="results-dashboard hidden">
+        <div class="results-header">
+          <div>
+            <h2>Audit Report</h2>
+            <p id="auditSummary">No results yet.</p>
+          </div>
+          <button id="downloadReportBtn" class="secondary-button">Download Report</button>
+        </div>
+
+        <div class="stats-grid">
+          <div class="stat"><span>Total</span><strong id="totalIssues">0</strong></div>
+          <div class="stat high"><span>High</span><strong id="highCount">0</strong></div>
+          <div class="stat medium"><span>Medium</span><strong id="mediumCount">0</strong></div>
+          <div class="stat low"><span>Low</span><strong id="lowCount">0</strong></div>
+          <div class="stat info"><span>Informational</span><strong id="infoCount">0</strong></div>
+        </div>
+
+        <div class="links-row">
+          <a id="ipfsLink" href="#" target="_blank" rel="noreferrer">IPFS Report</a>
+          <a id="etherscanLink" href="#" target="_blank" rel="noreferrer">Etherscan Transaction</a>
+          <span id="txHash">Transaction pending</span>
+        </div>
+
+        <div id="vulnerabilityList" class="vulnerability-list"></div>
+      </section>
+    </main>
+
+    <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script src="contractConfig.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

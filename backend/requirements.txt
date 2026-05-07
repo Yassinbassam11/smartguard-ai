@@ -1,0 +1,9 @@
+flask
+flask-cors
+flask-limiter
+slither-analyzer
+py-solc-x
+google-generativeai
+requests
+python-dotenv
+web3
