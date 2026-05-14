@@ -1,13 +1,13 @@
 import json
-import os
+import shutil
 import subprocess
+import sys
+import tempfile
 from pathlib import Path
 
 import solcx
 
 
-TEMP_CONTRACT = Path("temp_contract.sol")
-SLITHER_OUTPUT = Path("slither_output.json")
 MAX_CONTRACT_SIZE = 50 * 1024
 SEVERITY_ORDER = {
     "Informational": 0,
@@ -25,26 +25,39 @@ def scan_contract(solidity_code):
     if len(solidity_code.encode("utf-8")) > MAX_CONTRACT_SIZE:
         raise ValueError("Invalid Solidity input: contract exceeds 50KB limit")
 
-    try:
-        TEMP_CONTRACT.write_text(solidity_code, encoding="utf-8")
+    scan_dir = Path(tempfile.mkdtemp(prefix="smartguard_scan_"))
+    temp_contract = scan_dir / "temp_contract.sol"
+    slither_output = scan_dir / "slither_output.json"
 
+    try:
+        temp_contract.write_text(solidity_code, encoding="utf-8")
         solcx.install_solc("0.8.20")
         solcx.set_solc_version("0.8.20")
+        solc_path = _resolve_solc_path()
 
         completed = subprocess.run(
-            ["slither", str(TEMP_CONTRACT), "--json", str(SLITHER_OUTPUT)],
+            [
+                sys.executable,
+                "-m",
+                "slither",
+                str(temp_contract),
+                "--solc",
+                str(solc_path),
+                "--json",
+                str(slither_output),
+            ],
             timeout=60,
             capture_output=True,
             text=True,
             check=False,
         )
 
-        if not SLITHER_OUTPUT.exists():
+        if not slither_output.exists():
             message = completed.stderr or completed.stdout or "Slither did not produce output"
             raise RuntimeError(f"Slither failure: {message.strip()}")
 
         try:
-            raw = json.loads(SLITHER_OUTPUT.read_text(encoding="utf-8"))
+            raw = json.loads(slither_output.read_text(encoding="utf-8"))
         except json.JSONDecodeError as exc:
             raise RuntimeError("Slither returned malformed JSON") from exc
 
@@ -58,12 +71,23 @@ def scan_contract(solidity_code):
     except subprocess.TimeoutExpired as exc:
         raise TimeoutError("Slither analysis timed out after 60 seconds") from exc
     finally:
-        for temp_file in (TEMP_CONTRACT, SLITHER_OUTPUT):
-            try:
-                if temp_file.exists():
-                    temp_file.unlink()
-            except OSError:
-                pass
+        shutil.rmtree(scan_dir, ignore_errors=True)
+
+
+def _resolve_solc_path():
+    install_folder = Path(solcx.get_solcx_install_folder())
+    candidate = install_folder / "solc-v0.8.20"
+
+    if candidate.is_dir():
+        for name in ("solc.exe", "solc"):
+            executable = candidate / name
+            if executable.exists():
+                return executable
+
+    if candidate.exists():
+        return candidate
+
+    raise RuntimeError("Solidity compiler 0.8.20 was not installed correctly")
 
 
 def _parse_detectors(raw):

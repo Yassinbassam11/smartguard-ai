@@ -1,5 +1,7 @@
 import os
 import shutil
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -29,16 +31,22 @@ def analyze():
         payload = request.get_json(silent=True) or {}
         audit_id = payload.get("audit_id")
         code = payload.get("code", "")
+        advanced_ai = bool(payload.get("advanced_ai", False))
 
         if audit_id is None:
             return jsonify({"success": False, "error": "audit_id is required"}), 400
 
         scan_results = scan_contract(code)
-        vulnerabilities = explain_vulnerabilities(scan_results)
+        vulnerabilities = (
+            explain_vulnerabilities(scan_results)
+            if advanced_ai
+            else scan_results.get("vulnerabilities", [])
+        )
 
         report = {
             "audit_id": audit_id,
             "generated_at": datetime.now(timezone.utc).isoformat(),
+            "advanced_ai": advanced_ai,
             "vulnerabilities": vulnerabilities,
             "total_issues": scan_results["total"],
             "highest_severity": scan_results["highest_severity"],
@@ -49,6 +57,7 @@ def analyze():
             {
                 "success": True,
                 "audit_id": audit_id,
+                "advanced_ai": advanced_ai,
                 "vulnerabilities": vulnerabilities,
                 "total_issues": scan_results["total"],
                 "highest_severity": scan_results["highest_severity"],
@@ -67,7 +76,7 @@ def analyze():
 @app.get("/health")
 def health():
     try:
-        slither_available = shutil.which("slither") is not None
+        slither_available = _slither_available()
         gemini_configured = bool(os.getenv("GEMINI_API_KEY"))
         status = "ok" if slither_available and gemini_configured else "degraded"
         return jsonify(
@@ -79,6 +88,23 @@ def health():
         )
     except Exception as exc:
         return jsonify({"status": "error", "error": str(exc)}), 500
+
+
+def _slither_available():
+    if shutil.which("slither"):
+        return True
+
+    try:
+        completed = subprocess.run(
+            [sys.executable, "-m", "slither", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+            check=False,
+        )
+        return completed.returncode == 0
+    except Exception:
+        return False
 
 
 if __name__ == "__main__":

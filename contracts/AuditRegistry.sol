@@ -25,8 +25,11 @@ contract AuditRegistry is ReentrancyGuard {
     mapping(uint256 => Audit) public audits;
     mapping(address => uint256[]) public auditsByAddress;
     mapping(address => uint256) public securityCredits;
+    mapping(uint256 => uint256) public creditsSpentByAudit;
+    mapping(uint256 => uint256) public pdfCreditsSpentByAudit;
 
     uint256 public totalCreditsIssued;
+    uint256 public totalCreditsSpent;
     uint256 public auditCounter;
 
     address public immutable deployer;
@@ -34,12 +37,15 @@ contract AuditRegistry is ReentrancyGuard {
     address public validator;
 
     uint256 public constant CREDITS_PER_AUDIT = 10;
+    uint256 public constant ADVANCED_AUDIT_COST = 5;
+    uint256 public constant PDF_REPORT_COST = 3;
 
     event AuditRequested(uint256 indexed id, address indexed requester, uint256 timestamp);
     event AuditCompleted(uint256 indexed id, string ipfsHash, uint8 vulnerabilityCount);
     event AuditVerified(uint256 indexed id, address indexed validator);
     event CreditsAwarded(address indexed user, uint256 amount);
     event CreditsTransferred(address indexed from, address indexed to, uint256 amount);
+    event CreditsSpent(address indexed user, uint256 indexed auditId, uint256 amount, string service);
     event ValidatorUpdated(address indexed previousValidator, address indexed newValidator);
 
     modifier onlyOwner() {
@@ -133,6 +139,40 @@ contract AuditRegistry is ReentrancyGuard {
         securityCredits[_to] += _amount;
 
         emit CreditsTransferred(msg.sender, _to, _amount);
+    }
+
+    /// @notice Spends security credits to unlock the advanced AI audit report for an audit.
+    /// @dev Demonstrates a real use for the internal credit asset system.
+    /// @param _id Audit ID receiving the advanced service.
+    function spendCreditsForAdvancedAudit(uint256 _id) external nonReentrant auditExists(_id) {
+        Audit storage audit = audits[_id];
+        require(audit.requester == msg.sender, "AuditRegistry: caller did not request audit");
+        require(audit.status == AuditStatus.PENDING, "Audit must be pending");
+        require(creditsSpentByAudit[_id] == 0, "AuditRegistry: credits already spent");
+        require(securityCredits[msg.sender] >= ADVANCED_AUDIT_COST, "AuditRegistry: insufficient credits");
+
+        securityCredits[msg.sender] -= ADVANCED_AUDIT_COST;
+        creditsSpentByAudit[_id] = ADVANCED_AUDIT_COST;
+        totalCreditsSpent += ADVANCED_AUDIT_COST;
+
+        emit CreditsSpent(msg.sender, _id, ADVANCED_AUDIT_COST, "ADVANCED_AI_AUDIT");
+    }
+
+    /// @notice Spends security credits to unlock a human-readable PDF audit report.
+    /// @dev Demonstrates paid report-format access with the internal credit system.
+    /// @param _id Audit ID receiving the PDF report service.
+    function spendCreditsForPdfReport(uint256 _id) external nonReentrant auditExists(_id) {
+        Audit storage audit = audits[_id];
+        require(audit.requester == msg.sender, "AuditRegistry: caller did not request audit");
+        require(audit.status == AuditStatus.PENDING, "Audit must be pending");
+        require(pdfCreditsSpentByAudit[_id] == 0, "AuditRegistry: PDF credits already spent");
+        require(securityCredits[msg.sender] >= PDF_REPORT_COST, "AuditRegistry: insufficient credits");
+
+        securityCredits[msg.sender] -= PDF_REPORT_COST;
+        pdfCreditsSpentByAudit[_id] = PDF_REPORT_COST;
+        totalCreditsSpent += PDF_REPORT_COST;
+
+        emit CreditsSpent(msg.sender, _id, PDF_REPORT_COST, "PDF_REPORT");
     }
 
     /// @notice Sets the validator address that can complete and verify audits.

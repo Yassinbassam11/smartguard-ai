@@ -66,4 +66,54 @@ describe("AuditRegistry", function () {
     expect(await registry.balanceOf(requester.address)).to.equal(6);
     expect(await registry.balanceOf(recipient.address)).to.equal(4);
   });
+
+  it("spends credits for an advanced AI audit report", async function () {
+    const { registry, requester } = await deployFixture();
+
+    await registry.connect(requester).requestAudit();
+
+    await expect(registry.connect(requester).spendCreditsForAdvancedAudit(0))
+      .to.emit(registry, "CreditsSpent")
+      .withArgs(requester.address, 0, 5, "ADVANCED_AI_AUDIT");
+
+    expect(await registry.balanceOf(requester.address)).to.equal(5);
+    expect(await registry.creditsSpentByAudit(0)).to.equal(5);
+    expect(await registry.totalCreditsSpent()).to.equal(5);
+  });
+
+  it("prevents spending advanced audit credits twice", async function () {
+    const { registry, requester } = await deployFixture();
+
+    await registry.connect(requester).requestAudit();
+    await registry.connect(requester).spendCreditsForAdvancedAudit(0);
+
+    await expect(registry.connect(requester).spendCreditsForAdvancedAudit(0)).to.be.revertedWith(
+      "AuditRegistry: credits already spent"
+    );
+  });
+
+  it("spends credits for a human-readable PDF report", async function () {
+    const { registry, requester } = await deployFixture();
+
+    await registry.connect(requester).requestAudit();
+
+    await expect(registry.connect(requester).spendCreditsForPdfReport(0))
+      .to.emit(registry, "CreditsSpent")
+      .withArgs(requester.address, 0, 3, "PDF_REPORT");
+
+    expect(await registry.balanceOf(requester.address)).to.equal(7);
+    expect(await registry.pdfCreditsSpentByAudit(0)).to.equal(3);
+    expect(await registry.totalCreditsSpent()).to.equal(3);
+  });
+
+  it("spends credits for both optional services", async function () {
+    const { registry, requester } = await deployFixture();
+
+    await registry.connect(requester).requestAudit();
+    await registry.connect(requester).spendCreditsForAdvancedAudit(0);
+    await registry.connect(requester).spendCreditsForPdfReport(0);
+
+    expect(await registry.balanceOf(requester.address)).to.equal(2);
+    expect(await registry.totalCreditsSpent()).to.equal(8);
+  });
 });

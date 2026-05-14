@@ -17,6 +17,7 @@
         <div class="wallet-meta">
           <span id="walletAddress">Not connected</span>
           <span id="networkName">Unknown network</span>
+          <span id="creditBalance">Credits: --</span>
         </div>
       </div>
     </header>
@@ -36,6 +37,18 @@
         </div>
 
         <textarea id="contractCode" spellcheck="false" placeholder="pragma solidity ^0.8.20;&#10;&#10;contract Example {&#10;    // Paste your Solidity contract here&#10;}"></textarea>
+        <div class="service-options">
+          <label>
+            <input id="advancedAiOption" type="checkbox" />
+            <span>Advanced AI explanations</span>
+            <strong>5 credits</strong>
+          </label>
+          <label>
+            <input id="pdfReportOption" type="checkbox" />
+            <span>Human-readable PDF report</span>
+            <strong>3 credits</strong>
+          </label>
+        </div>
         <div class="editor-footer">
           <span id="charCount">0 characters</span>
           <button id="analyzeBtn" class="primary-button" disabled>Analyze Contract</button>
@@ -58,7 +71,11 @@
             <h2>Audit Report</h2>
             <p id="auditSummary">No results yet.</p>
           </div>
-          <button id="downloadReportBtn" class="secondary-button">Download Report</button>
+          <div class="download-actions">
+            <button id="downloadReportBtn" class="secondary-button">JSON</button>
+            <button id="downloadHtmlReportBtn" class="secondary-button">HTML</button>
+            <button id="downloadPdfReportBtn" class="secondary-button hidden">PDF</button>
+          </div>
         </div>
 
         <div class="stats-grid">
@@ -73,6 +90,7 @@
           <a id="ipfsLink" href="#" target="_blank" rel="noreferrer">IPFS Report</a>
           <a id="etherscanLink" href="#" target="_blank" rel="noreferrer">Etherscan Transaction</a>
           <span id="txHash">Transaction pending</span>
+          <span id="creditUsage">Credits pending</span>
         </div>
 
         <div id="vulnerabilityList" class="vulnerability-list"></div>
@@ -80,6 +98,7 @@
     </main>
 
     <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
     <script src="contractConfig.js"></script>
     <script src="app.js"></script>
   </body>

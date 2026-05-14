@@ -1,6 +1,8 @@
 const REQUIRED_CHAIN_ID_DEC = 11155111;
 const REQUIRED_CHAIN_ID_HEX = "0xaa36a7";
 const BACKEND_URL = "http://127.0.0.1:5000";
+const ADVANCED_AUDIT_COST = 5;
+const PDF_REPORT_COST = 3;
 const SAMPLE_CONTRACT = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
@@ -58,12 +60,19 @@ const progressItems = Array.from(document.querySelectorAll("#progressList li"));
 const resultsDashboard = document.getElementById("resultsDashboard");
 const vulnerabilityList = document.getElementById("vulnerabilityList");
 const downloadReportBtn = document.getElementById("downloadReportBtn");
+const downloadHtmlReportBtn = document.getElementById("downloadHtmlReportBtn");
+const downloadPdfReportBtn = document.getElementById("downloadPdfReportBtn");
+const creditBalance = document.getElementById("creditBalance");
+const advancedAiOption = document.getElementById("advancedAiOption");
+const pdfReportOption = document.getElementById("pdfReportOption");
 
 connectWalletBtn.addEventListener("click", connectWallet);
 loadSampleBtn.addEventListener("click", loadSampleContract);
 contractCode.addEventListener("input", updateFormState);
 analyzeBtn.addEventListener("click", analyzeContract);
 downloadReportBtn.addEventListener("click", downloadReport);
+downloadHtmlReportBtn.addEventListener("click", downloadHtmlReport);
+downloadPdfReportBtn.addEventListener("click", downloadPdfReport);
 
 if (window.ethereum) {
   window.ethereum.on("accountsChanged", () => {
@@ -112,6 +121,7 @@ async function connectWallet() {
     networkWarning.classList.remove("hidden");
   } else {
     contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+    await refreshCreditBalance();
   }
 
   updateFormState();
@@ -127,6 +137,22 @@ async function analyzeContract() {
     const requestReceipt = await requestTx.wait();
     const auditId = extractAuditId(requestReceipt);
 
+    let creditsSpent = 0;
+    if (advancedAiOption.checked) {
+      const spendTx = await contract.spendCreditsForAdvancedAudit(auditId);
+      await spendTx.wait();
+      creditsSpent += ADVANCED_AUDIT_COST;
+    }
+
+    if (pdfReportOption.checked) {
+      const pdfSpendTx = await contract.spendCreditsForPdfReport(auditId);
+      await pdfSpendTx.wait();
+      creditsSpent += PDF_REPORT_COST;
+    }
+
+    const remainingCredits = await contract.balanceOf(connectedAddress);
+    creditBalance.textContent = `Credits: ${remainingCredits}`;
+
     setProgress(0);
     setProgress(1);
     setProgress(2);
@@ -137,6 +163,7 @@ async function analyzeContract() {
       body: JSON.stringify({
         audit_id: Number(auditId),
         code: contractCode.value,
+        advanced_ai: advancedAiOption.checked,
       }),
     });
 
@@ -160,6 +187,10 @@ async function analyzeContract() {
       audit_id: Number(auditId),
       request_tx_hash: requestReceipt.hash,
       complete_tx_hash: completeReceipt.hash,
+      credits_spent: creditsSpent,
+      remaining_credits: Number(remainingCredits),
+      advanced_ai: advancedAiOption.checked,
+      pdf_report: pdfReportOption.checked,
     };
     renderResults(latestReport);
   } catch (error) {
@@ -195,6 +226,8 @@ function renderResults(report) {
   document.getElementById("ipfsLink").href = report.ipfs_url;
   document.getElementById("etherscanLink").href = `https://sepolia.etherscan.io/tx/${report.complete_tx_hash}`;
   document.getElementById("txHash").textContent = shortenHash(report.complete_tx_hash);
+  document.getElementById("creditUsage").textContent = `${report.credits_spent} credits spent, ${report.remaining_credits} remaining`;
+  downloadPdfReportBtn.classList.toggle("hidden", !report.pdf_report);
 
   vulnerabilityList.innerHTML = "";
   if (report.vulnerabilities.length === 0) {
@@ -210,8 +243,8 @@ function renderResults(report) {
           <span class="badge ${badgeClass}">${escapeHtml(vulnerability.severity)}</span>
         </header>
         <p><strong>Affected lines:</strong> ${formatLines(vulnerability.lines)}</p>
-        <p><strong>AI explanation:</strong> ${escapeHtml(vulnerability.plain_explanation || "No explanation returned.")}</p>
-        <p><strong>Fix suggestion:</strong> ${escapeHtml(vulnerability.fix_suggestion || "Review this finding manually.")}</p>
+        <p><strong>${report.advanced_ai ? "AI explanation" : "Description"}:</strong> ${escapeHtml(vulnerability.plain_explanation || vulnerability.description || "No explanation returned.")}</p>
+        <p><strong>Fix suggestion:</strong> ${escapeHtml(vulnerability.fix_suggestion || "Enable advanced AI explanations for a detailed fix suggestion.")}</p>
       `;
       vulnerabilityList.appendChild(card);
     });
@@ -256,10 +289,81 @@ function downloadReport() {
   URL.revokeObjectURL(url);
 }
 
+function downloadHtmlReport() {
+  if (!latestReport) {
+    return;
+  }
+  const html = buildHumanReportHtml(latestReport);
+  const blob = new Blob([html], { type: "text/html" });
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = `smartguard-audit-${latestReport.audit_id}.html`;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadPdfReport() {
+  if (!latestReport || !latestReport.pdf_report) {
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const margin = 14;
+  const maxWidth = 182;
+  let y = 18;
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(18);
+  doc.text("SmartGuard AI Audit Report", margin, y);
+  y += 10;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(10);
+  const summary = [
+    `Audit ID: ${latestReport.audit_id}`,
+    `Total issues: ${latestReport.total_issues}`,
+    `Highest severity: ${latestReport.highest_severity}`,
+    `Advanced AI: ${latestReport.advanced_ai ? "Enabled" : "Disabled"}`,
+    `Credits spent: ${latestReport.credits_spent}`,
+    `IPFS: ${latestReport.ipfs_url}`,
+  ];
+
+  summary.forEach((line) => {
+    y = writeWrappedPdfText(doc, line, margin, y, maxWidth);
+  });
+
+  latestReport.vulnerabilities.forEach((vulnerability, index) => {
+    if (y > 260) {
+      doc.addPage();
+      y = 18;
+    }
+    doc.setFont("helvetica", "bold");
+    y = writeWrappedPdfText(doc, `${index + 1}. ${vulnerability.name} (${vulnerability.severity})`, margin, y + 4, maxWidth);
+    doc.setFont("helvetica", "normal");
+    y = writeWrappedPdfText(doc, `Lines: ${formatLines(vulnerability.lines)}`, margin, y, maxWidth);
+    y = writeWrappedPdfText(doc, `Explanation: ${vulnerability.plain_explanation || vulnerability.description || "N/A"}`, margin, y, maxWidth);
+    y = writeWrappedPdfText(doc, `Fix: ${vulnerability.fix_suggestion || "Enable advanced AI explanations for a detailed fix suggestion."}`, margin, y, maxWidth);
+  });
+
+  doc.save(`smartguard-audit-${latestReport.audit_id}.pdf`);
+}
+
 function updateFormState() {
   const hasCode = contractCode.value.trim().length > 0;
   charCount.textContent = `${contractCode.value.length} characters`;
   analyzeBtn.disabled = !connectedAddress || !hasCode || !contract;
+}
+
+async function refreshCreditBalance() {
+  if (!contract || !connectedAddress) {
+    creditBalance.textContent = "Credits: --";
+    return;
+  }
+
+  const balance = await contract.balanceOf(connectedAddress);
+  creditBalance.textContent = `Credits: ${balance}`;
 }
 
 function setProgress(index) {
@@ -288,4 +392,50 @@ function escapeHtml(value) {
     .replaceAll(">", "&gt;")
     .replaceAll('"', "&quot;")
     .replaceAll("'", "&#039;");
+}
+
+function buildHumanReportHtml(report) {
+  const items = report.vulnerabilities
+    .map(
+      (vulnerability, index) => `
+        <section>
+          <h2>${index + 1}. ${escapeHtml(vulnerability.name)} - ${escapeHtml(vulnerability.severity)}</h2>
+          <p><strong>Affected lines:</strong> ${escapeHtml(formatLines(vulnerability.lines))}</p>
+          <p><strong>${report.advanced_ai ? "AI explanation" : "Description"}:</strong> ${escapeHtml(vulnerability.plain_explanation || vulnerability.description || "N/A")}</p>
+          <p><strong>Fix suggestion:</strong> ${escapeHtml(vulnerability.fix_suggestion || "Enable advanced AI explanations for a detailed fix suggestion.")}</p>
+        </section>`
+    )
+    .join("");
+
+  return `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8" />
+  <title>SmartGuard AI Audit ${report.audit_id}</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 900px; margin: 32px auto; line-height: 1.55; color: #17211d; }
+    h1 { border-bottom: 3px solid #0e766e; padding-bottom: 10px; }
+    section { border-top: 1px solid #d9e1dc; padding-top: 16px; margin-top: 16px; }
+    .meta { background: #f4f7f4; padding: 16px; border-radius: 8px; }
+  </style>
+</head>
+<body>
+  <h1>SmartGuard AI Audit Report</h1>
+  <div class="meta">
+    <p><strong>Audit ID:</strong> ${report.audit_id}</p>
+    <p><strong>Total issues:</strong> ${report.total_issues}</p>
+    <p><strong>Highest severity:</strong> ${escapeHtml(report.highest_severity)}</p>
+    <p><strong>Advanced AI:</strong> ${report.advanced_ai ? "Enabled" : "Disabled"}</p>
+    <p><strong>Credits spent:</strong> ${report.credits_spent}</p>
+    <p><strong>IPFS:</strong> <a href="${escapeHtml(report.ipfs_url)}">${escapeHtml(report.ipfs_url)}</a></p>
+  </div>
+  ${items || "<p>No vulnerabilities were reported.</p>"}
+</body>
+</html>`;
+}
+
+function writeWrappedPdfText(doc, text, x, y, maxWidth) {
+  const lines = doc.splitTextToSize(String(text), maxWidth);
+  doc.text(lines, x, y);
+  return y + lines.length * 5 + 3;
 }

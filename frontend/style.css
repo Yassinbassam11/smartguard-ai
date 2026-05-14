@@ -106,6 +106,38 @@ h2 {
   gap: 16px;
 }
 
+.service-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 0 0 14px;
+}
+
+.service-options label {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfdfb;
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.service-options strong {
+  color: var(--accent-dark);
+  font-size: 0.88rem;
+}
+
+.download-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
 .editor-toolbar p,
 .results-header p {
   margin-bottom: 0;
@@ -314,6 +346,10 @@ a {
 
   .stats-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .service-options {
+    grid-template-columns: 1fr;
   }
 }
 

@@ -16,13 +16,22 @@ This project was built for the AID 325 Blockchain Technology course.
 - Sepolia testnet integration
 - On-chain audit lifecycle using `requestAudit()`, `completeAudit()`, and `verifyAudit()`
 - Solidity vulnerability scanning with Slither
-- AI explanations and fix suggestions using Gemini
+- Optional AI explanations and fix suggestions using Gemini
+- Optional human-readable PDF report generation
 - Permanent report storage on IPFS using Pinata
 - Audit dashboard with vulnerability statistics
 - Etherscan transaction links
 - Downloadable JSON audit report
 - Hardhat tests and gas reporting
 - Threat model documentation
+
+## Submission Support Files
+
+- `SUBMISSION_CHECKLIST.md`: maps the project to the AID 325 technical specification.
+- `FINAL_PROJECT_REPORT.md`: draft content for the final Word/PDF report.
+- `PRESENTATION_SLIDES.md`: slide-by-slide plan for the discussion presentation.
+- `VIDEO_DEMO_SCRIPT.md`: 5-7 minute video demonstration script.
+- `THREAT_MODEL.md`: adversarial model and mitigations.
 
 ## Project Structure
 
@@ -48,6 +57,10 @@ smartguard-ai/
 |   |-- app.js
 |   `-- contractConfig.js
 |-- THREAT_MODEL.md
+|-- FINAL_PROJECT_REPORT.md
+|-- PRESENTATION_SLIDES.md
+|-- VIDEO_DEMO_SCRIPT.md
+|-- SUBMISSION_CHECKLIST.md
 |-- README.md
 |-- hardhat.config.js
 |-- package.json
@@ -74,14 +87,16 @@ The project demonstrates state-dependent blockchain transitions:
 4. Smart contract creates a new audit with status `PENDING`.
 5. Frontend extracts the audit ID from the `AuditRequested` event.
 6. Frontend sends the audit ID and Solidity code to the Flask backend.
-7. Backend runs Slither static analysis.
-8. Backend asks Gemini to explain each vulnerability.
-9. Backend uploads the full JSON report to IPFS using Pinata.
-10. Backend returns vulnerabilities, IPFS hash, highest severity, and vulnerability count.
-11. Frontend calls `completeAudit()` on-chain.
-12. Smart contract changes status from `PENDING` to `COMPLETED`.
-13. Optional validator action can call `verifyAudit()` to change status from `COMPLETED` to `VERIFIED`.
-14. Frontend displays the audit report, transaction hash, Etherscan link, IPFS link, and vulnerability statistics.
+7. User optionally spends 5 credits to unlock advanced Gemini AI explanations.
+8. User optionally spends 3 credits to unlock a human-readable PDF report.
+9. Backend runs Slither static analysis.
+10. If advanced AI is selected, backend asks Gemini to explain each vulnerability.
+11. Backend uploads the full JSON report to IPFS using Pinata.
+12. Backend returns vulnerabilities, IPFS hash, highest severity, and vulnerability count.
+13. Frontend calls `completeAudit()` on-chain.
+14. Smart contract changes status from `PENDING` to `COMPLETED`.
+15. Optional validator action can call `verifyAudit()` to change status from `COMPLETED` to `VERIFIED`.
+16. Frontend displays the audit report, transaction hash, Etherscan link, IPFS link, credit usage, and vulnerability statistics.
 
 ## Security Design
 
@@ -89,10 +104,10 @@ The Solidity contract includes:
 
 - `onlyOwner` access control
 - `onlyValidator` access control
-- `nonReentrant` protection for credit transfers
+- `nonReentrant` protection for credit transfers and credit spending
 - Checks-Effects-Interactions pattern
 - Immutable deployer address
-- Constant credit amount
+- Constant credit award, advanced audit cost, and PDF report cost
 - Descriptive `require()` messages
 - State-dependent transitions: `PENDING -> COMPLETED -> VERIFIED`
 - Events for important state-changing actions
@@ -108,6 +123,19 @@ The backend includes:
 - Safe error responses
 
 More details are in `THREAT_MODEL.md`.
+
+## Internal Credit System
+
+SmartGuard AI uses Choice C from the asset standards requirement: a custom internal credit system.
+
+- Users can see their credit balance before analysis in the wallet panel.
+- Users receive 10 security credits when they call `requestAudit()`.
+- Advanced AI explanations are optional and cost 5 credits through `spendCreditsForAdvancedAudit()`.
+- A human-readable PDF report is optional and costs 3 credits through `spendCreditsForPdfReport()`.
+- Users can check their balance with `balanceOf(address)`.
+- Users can transfer credits to another wallet with `transferCredits(address,uint256)`.
+
+This gives credits real project uses: they work like internal reward points that can be spent on optional SmartGuard AI services.
 
 ## Requirements
 
@@ -271,6 +299,7 @@ The tests cover:
 - Preventing duplicate completion
 - Blocking non-validator completion
 - Transferring security credits
+- Spending credits for optional advanced AI and PDF report services
 
 ## Gas Report
 
