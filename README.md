@@ -249,7 +249,8 @@ Expected response:
 {
   "status": "ok",
   "slither": true,
-  "gemini": true
+  "gemini": true,
+  "gemini_model": "gemini-2.5-flash"
 }
 ```
 
@@ -326,7 +327,8 @@ Request:
 ```json
 {
   "audit_id": 1,
-  "code": "pragma solidity ^0.8.20; contract Example {}"
+  "code": "pragma solidity ^0.8.20; contract Example {}",
+  "advanced_ai": true
 }
 ```
 

@@ -1,7 +1,22 @@
 import json
 import os
 
-import google.generativeai as genai
+from google import genai
+
+
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+GEMINI_RESPONSE_SCHEMA = {
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "plain_explanation": {"type": "string"},
+            "fix_suggestion": {"type": "string"},
+            "severity_reason": {"type": "string"},
+        },
+        "required": ["plain_explanation", "fix_suggestion", "severity_reason"],
+    },
+}
 
 
 def explain_vulnerabilities(scan_results):
@@ -14,8 +29,7 @@ def explain_vulnerabilities(scan_results):
     if not api_key:
         return [_with_fallback_explanation(vuln) for vuln in vulnerabilities]
 
-    genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash")
+    client = genai.Client(api_key=api_key)
 
     prompt = f"""You are a blockchain security expert.
 
@@ -33,7 +47,15 @@ No markdown.
 No extra text."""
 
     try:
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model=get_gemini_model(),
+            contents=prompt,
+            config={
+                "response_mime_type": "application/json",
+                "response_json_schema": GEMINI_RESPONSE_SCHEMA,
+                "temperature": 0.2,
+            },
+        )
         explanations = json.loads(_clean_json(response.text))
         if isinstance(explanations, dict):
             explanations = explanations.get("vulnerabilities", [])
@@ -64,6 +86,10 @@ No extra text."""
         )
 
     return merged
+
+
+def get_gemini_model():
+    return os.getenv("GEMINI_MODEL", DEFAULT_GEMINI_MODEL)
 
 
 def _clean_json(text):

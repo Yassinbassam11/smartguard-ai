@@ -11,7 +11,7 @@ from flask_cors import CORS
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
 
-from ai_explain import explain_vulnerabilities
+from ai_explain import explain_vulnerabilities, get_gemini_model
 from ipfs_upload import upload_to_ipfs
 from scanner import scan_contract
 
@@ -84,6 +84,7 @@ def health():
                 "status": status,
                 "slither": slither_available,
                 "gemini": gemini_configured,
+                "gemini_model": get_gemini_model(),
             }
         )
     except Exception as exc:

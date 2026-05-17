@@ -3,7 +3,7 @@ flask-cors
 flask-limiter
 slither-analyzer
 py-solc-x
-google-generativeai
+google-genai
 requests
 python-dotenv
 web3
